@@ -12,6 +12,7 @@ const {
 const GIST_TITLE = "Hours this week";
 const MAX_LANGUAGES = 5;
 const BAR_WIDTH = 21;
+const DIVIDER = "─".repeat(46);
 
 const wakatime = new WakaTimeClient(wakatimeApiKey, wakatimeApiUrl);
 const octokit = new Octokit({ auth: githubToken });
@@ -43,9 +44,9 @@ async function updateGist(stats) {
     const { name, percent, text: time } = data;
     const line = [
       trimRightStr(name, 10).padEnd(10),
-      time.padEnd(14),
       generateBarChart(percent, BAR_WIDTH),
-      String(percent.toFixed(1)).padStart(5) + "%"
+      String(percent.toFixed(1)).padStart(5) + "%",
+      time.padStart(12)
     ];
     lines.push(line.join(" "));
   }
@@ -55,10 +56,19 @@ async function updateGist(stats) {
     return;
   }
 
-  // Add a total-time header above the breakdown
   const totalTime = stats.data.human_readable_total || stats.data.text;
-  const header = totalTime ? [`Total: ${totalTime}`, ""] : [];
-  const content = [...header, ...lines].join("\n");
+  const blocks = [];
+
+  if (totalTime) {
+    blocks.push(`Total this week: ${totalTime}`);
+    blocks.push(DIVIDER);
+  }
+
+  blocks.push(...lines);
+  blocks.push(DIVIDER);
+  blocks.push(`Updated ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC`);
+
+  const content = blocks.join("\n");
 
   try {
     // Get original filename to update that same file
@@ -79,16 +89,10 @@ async function updateGist(stats) {
 }
 
 function generateBarChart(percent, size) {
-  const syms = "░▏▎▍▌▋▊▉█";
-  const frac = Math.floor((size * 8 * percent) / 100);
-  const barsFull = Math.floor(frac / 8);
-  if (barsFull >= size) {
-    return syms.substring(8, 9).repeat(size);
-  }
-  const semi = frac % 8;
-  return [syms.substring(8, 9).repeat(barsFull), syms.substring(semi, semi + 1)]
-    .join("")
-    .padEnd(size, syms.substring(0, 1));
+  const filled = "█";
+  const empty = "·";
+  const barsFull = Math.round((size * percent) / 100);
+  return filled.repeat(barsFull).padEnd(size, empty);
 }
 
 (async () => {
